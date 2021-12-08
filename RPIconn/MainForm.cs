@@ -16,44 +16,33 @@ namespace RPIconn
 	{
 	public partial class MainForm:Form
 		{
-		#region DEFs
-		public static readonly string CFG_FILENAME = "conn.cfg";	// Configuration file (same folder)
-		public static readonly string IP = "ip";					// Login: ip address...
-		public static readonly string USR = "usr";					// ...username...
-		public static readonly string PWD = "pwd";					// ...password.
-		public static readonly float CONN_REFRESH = 1;				// Connection display status refresh (seconds)
-		public static readonly int CANCEL_PAUSE = 300;				// Wait task to stop (msec)
-		
-		public static readonly string CMD_FILENAME = "cmd.cfg";		// Command file (same folder)
-		public static readonly string CMD = "->CMD";				// Start command
-		public static readonly string END = "<-";					// End command
-		public static readonly string REM = "#";					// Comment line
 
-
-		#endregion
-
-		// DA FARE
+		//		FATTO:
 		//			Provare disconnessione (RPI spenta durante una sessione)
 		//			Aggiungere evento OnClose() per chiudere le connessione
 		//			Se chiamato Disconnect prima del termine del Task Connect, si blocca.
 		//			L'interfaccia non può esser modificata dai Task. Usare BeginInvoke o Invoke()
 		//			Vedere se BeginInvoke richiede un EndInvoke. Non necessario !
-		#warning	Occhio al ciclo di lettura della lista dei messaggi (yield retunn). Aggiungere lock() o impedire la cancellazione di messaggi (solo sotto lock): fare una classe derivata ?
-		#warning	Capire come leggere le risposte in modo sincrono (leggere i nomi delle variabili con Back12.sh -i)
 		//			Capire come leggere le risposte in modo asincrono: non serve al momento, eseguendo dei comandi relativamente semplici.
-		#warning	File di configurazione: come codificare nel file la lettura dei dati ricevuti
-		#warning	Permettere 1 solo avvio in multithread di un singolo comando
+		//			Lista di Task. Non serve, con Task.Factory.StartNew(...) si crea un Task nel ThreadPool gestito dal Common Language Runtime
 		//			Usare il Dictionary dei comandi, con un oggetto ComandoTask con i dati del comando
 		//			L'oggetto ComandoTask contiene: lista comandi e dei risultati, Task, dati (output, callback), stato (per es. se è già avviato...)
+		//			Capire come leggere le risposte in modo sincrono (leggere i nomi delle variabili con Back12.sh -i). Leggere l'output.
+
+		#warning DA FARE:
+		#warning	Occhio al ciclo di lettura della lista dei messaggi (yield retunn). Aggiungere lock() o impedire la cancellazione di messaggi (solo sotto lock): fare una classe derivata ?
+			
+		#warning	File di configurazione: come codificare nel file la lettura dei dati ricevuti. Per ora comando READ per leggere le variabili
+		#warning	Permettere 1 solo avvio in multithread di un singolo comando
+		
 		#warning	Modificare, all'avvio e alla chiusura di un comando, la sua visualizzazione nella listbox
 		#warning	Studiare listbox derivate (con i colori) e con oggetti (invece che con stringhe). L'oggetto è un ComandoTask.
 		#warning	Aggiungere un lock alla list box ? No, usare BeginInvoke() dal thread del comando al thread principale (main UI thread).
-		//			Lista di Task. Non serve, con Task.Factory.StartNew(...) si crea un Task nel ThreadPool gestito dal Common Language Runtime
+		
 		#warning	Capire come leggere le informazioni dei file (ultima modifica e dimensione) su Windows
 		#warning	Capire come leggere le informazioni dei file (ultima modifica e dimensione) su Linux
 		#warning	Capire come eseguire il trasferimento di file in ssh, da programma
 
-		// DA FARE IN FUTURO
 		#warning	In futuro: Aggiungere form per inserire i dati per il collegamento
 		#warning	In futuro: salvare la password crittografata (chiave nelle impostazioni di configurazione utente del programma)
 
@@ -75,10 +64,10 @@ namespace RPIconn
 		/// </summary>
 		Dictionary<string, string> cfg = new Dictionary<string, string>()
 			{
-				{IP,""},
-				{USR,""},
-				{PWD,""},
-				{CMD,""}
+				{Defs.IP,""},
+				{Defs.USR,""},
+				{Defs.PWD,""},
+				{Defs.CMD,""}
 			};
 
 
@@ -98,6 +87,21 @@ namespace RPIconn
 		bool pendingQuit;
 
 		#endregion
+
+		#region COMMAND AND VARIABLES DATA
+
+		/// <summary>
+		/// Command dictionary
+		/// </summary>
+		DictionaryWithLock<ComandoT> comandi;
+
+		/// <summary>
+		/// Variables dictionary
+		/// </summary>
+		DictionaryWithLock<string> variabili;
+		
+		#endregion
+
 
 
 		#region PROPERTIES
@@ -205,25 +209,40 @@ namespace RPIconn
 				}
 			}
 
-		#endregion
-
-
-		#region SSH COMMAND DATA
+		/// <summary>
+		/// Connection Data
+		/// </summary>
+		public ConnectionData ConnData
+			{
+			get {return connData;}
+			}
 
 		/// <summary>
 		/// Command dictionary
 		/// </summary>
-		Dictionary<string,ComandoT> comandi;
+		public DictionaryWithLock<ComandoT> Comandi
+			{
+			get {return comandi;}
+			}
 
+		/// <summary>
+		/// Variables dictionary
+		/// </summary>
+		public DictionaryWithLock<string> Variabili
+			{
+			get {return variabili;}
+			}
 		#endregion
 
 
-		#region MAIN FORM
+		
 
+
+		#region MAIN FORM
 		#region GUI
-		Font lbFont = new Font("Courier New", 9);
-		SolidBrush lbBrushAvail = new SolidBrush(Color.Blue);
-		SolidBrush lbBrushUnavai = new SolidBrush(Color.DarkRed);
+		Font lbFont;
+		SolidBrush lbBrushAvail;
+		SolidBrush lbBrushUnavai;
 		#endregion
 		
 		
@@ -233,15 +252,16 @@ namespace RPIconn
 		public MainForm()
 			{
 			InitializeComponent();
-			configFile = CFG_FILENAME;
+			configFile = Defs.CFG_FILENAME;
 			connData = new ConnectionData();
-			//sshClient = null;
-			//connectTask = null;
 			pendingQuit = false;
 			
-			commandFile = CMD_FILENAME;
+			commandFile = Defs.CMD_FILENAME;
 
-			comandi = new Dictionary<string, ComandoT>();
+			comandi = new DictionaryWithLock<ComandoT>();
+			variabili = new DictionaryWithLock<string>();
+
+			ComandoT.SetVariabili(variabili);
 
 			}
 
@@ -252,14 +272,14 @@ namespace RPIconn
 		/// <param name="e"></param>
 		private void MainForm_Load(object sender,EventArgs e)
 			{
-			lbFont = new Font("Courier New", 10);
+			lbFont = new Font(Defs.FONT, Defs.FONT_SIZE);
 			lbBrushAvail = new SolidBrush(Color.Blue);
 			lbBrushUnavai = new SolidBrush(Color.DarkRed);
 
-			refreshTimer.Interval = (int)(CONN_REFRESH*1000f);
+			refreshTimer.Interval = (int)(Defs.CONN_REFRESH*1000f);
 			refreshTimer.Enabled = true;
 			
-			if(!ReadCommands(commandFile, ref comandi))
+			if(!ComandoT.ReadCommands(commandFile, ConnData, Comandi))
 				{
 				MessageBox.Show(Messaggi.ERR.COMMANDS);
 				}
@@ -282,8 +302,28 @@ namespace RPIconn
 		/// </summary>
 		public void UpdateStatus()
 			{
-
 			lbStat.Text = this.ConnectionStatus.ToString();
+
+			switch(ConnectionStatus)
+				{
+				case ConnectionStatEnum.Connected:
+					{
+					bConnect.Text = Messaggi.GUI.MSG.DISCONNECT;
+					}
+					break;
+				case ConnectionStatEnum.Disconnected:
+					{
+					bConnect.Text = Messaggi.GUI.MSG.CONNECT;
+					}
+					break;
+				default:
+					{
+					bConnect.Text = this.ConnectionStatus.ToString()+"...";
+					}
+					break;
+				}
+
+			
 			lbQuitPnd.Text = pendingQuit ? "Closing program" : string.Empty;
 
 			Tuple<string,string> cinfo = ConnStat;
@@ -349,7 +389,7 @@ namespace RPIconn
 			Messaggi.Clear();
 			try
 				{
-				sshc = new SshClient(cfg[IP], cfg[USR], cfg[PWD]);
+				sshc = new SshClient(cfg[Defs.IP], cfg[Defs.USR], cfg[Defs.PWD]);
 				sshc.Connect();
 				}
 			catch(Exception ex)
@@ -460,7 +500,7 @@ namespace RPIconn
 					#if DEBUG
 					Messaggi.AddMessage("Richiesta cancellazione del task di connessione");
 					#endif
-					Thread.Sleep(CANCEL_PAUSE);		// Wait task to stop (msec)
+					Thread.Sleep(Defs.CANCEL_PAUSE);		// Wait task to stop (msec)
 					}
 				else								// If a cancellation request is pending...
 					{
@@ -534,8 +574,8 @@ namespace RPIconn
 					}
 				sr.Close();
 				sr = null;
-				if((dict[IP].Length==0)||(dict[USR].Length==0)||(dict[PWD].Length==0))
-					throw new Exception($"Some parameter is empty: {IP}={dict[IP]}, {USR}={dict[USR]}, {PWD}={dict[PWD]}");
+				if((dict[Defs.IP].Length==0)||(dict[Defs.USR].Length==0)||(dict[Defs.PWD].Length==0))
+					throw new Exception($"Some parameter is empty: {Defs.IP}={dict[Defs.IP]}, {Defs.USR}={dict[Defs.USR]}, {Defs.PWD}={dict[Defs.PWD]}");
 				}
 			catch(Exception ex)
 				{
@@ -554,102 +594,6 @@ namespace RPIconn
 
 		#endregion
 
-
-		#region SSH COMMAND FUNCTIONS
-
-		/// <summary>
-		/// Read command file and fill command dictionary
-		/// </summary>
-		/// <param name="filename"></param>
-		/// <param name="dict"></param>
-		/// <returns></returns>
-		bool ReadCommands(string filename, ref Dictionary<string, ComandoT> dict)
-			{
-			bool ok = true;
-			StreamReader sr = null;
-			try
-				{
-				sr = File.OpenText(filename);
-
-				bool inCommand = false;					// flag, reading lines inside a command
-				int lc = 0;								// line counter
-				string cmd;								// Active command
-				List<ComandoT.ComandoTxt> cmdList;		// Active command list
-
-				cmd = string.Empty;
-				cmdList = new List<ComandoT.ComandoTxt>();
-
-				while(sr.Peek() >= 0)
-					{
-					string line = sr.ReadLine();
-					lc++;
-					if( (line.Length>0) && (!line.StartsWith(REM)) )		// Se riga non nulla e non di commento
-						{
-						if(line.StartsWith(CMD))							// Nuovo comando
-							{
-							cmd = line.Substring(CMD.Length+1);				// Estrae il comando
-							if(cmd.Length == 0)								// Comando nullo
-								{
-								throw new Exception($"Empty command in line {lc}");
-								}
-							#if DEBUG
-							Messaggi.AddMessage($"Opening new command: [{cmd}]");
-							#endif
-
-							if(!inCommand)									// Nuovo comando
-								{
-								inCommand = true;
-								cmdList = new List<ComandoT.ComandoTxt>();	// Crea una lista di comandi
-								}
-							else											// Errore, è già iniziato un nuovo comando
-								{
-								throw new Exception($"Previous command non closed in line {lc}");
-								}
-							}
-						else if(line.StartsWith(END))						// Chiude il comando attivo
-							{
-							inCommand = false;
-							if(cmdList.Count>0)
-								{
-								ComandoT cmdT = new ComandoT(connData, cmd);	// Crea un oggetto con i comandi
-								cmdT.ComandiBash = cmdList;						// Assegna la lista dei comandi
-								comandi.Add(cmd, cmdT);							// Lo aggiunge al dizionario
-								#if DEBUG
-								Messaggi.AddMessage($"Added [{cmd}] command !");
-								#endif
-								}
-							cmd = string.Empty;
-							}
-						else if(inCommand)
-							{
-							cmdList.Add(new ComandoT.ComandoTxt(line));
-							#if DEBUG
-							Messaggi.AddMessage($"[{cmd}] reading line: [{line}] ");
-							#endif
-							}
-						}
-					}
-				sr.Close();
-				sr = null;
-				//	throw new Exception($"Command file read NOT IMPLEMENTED, yet");
-				}
-			catch(Exception ex)
-				{
-				ok = false;
-				Messaggi.AddMessage(Messaggi.ERR.ERROR, Messaggi.Tipo.Errori, ex.Message);
-				}
-			finally
-				{
-				if(sr != null)
-					{
-					sr.Close();
-					}
-				}
-			// comandi.Add("TEST", new List<string> {"ls", "pwd" });
-			return ok;
-			}
-
-		#endregion
 
 
 		#region EVENT HANDLERS
@@ -661,11 +605,36 @@ namespace RPIconn
 		/// <param name="e"></param>
 		private void bConnect_Click(object sender,EventArgs e)
 			{
-			if(connData.connectTask == null)
+			switch(this.ConnectionStatus)
 				{
-				connData.connectTask = StartConnection();
+				case ConnectionStatEnum.Disconnected:
+					{
+					connData.connectTask = StartConnection();
+					}
+					break;
+				case ConnectionStatEnum.Connected:
+					{
+					if(CheckActiveTask())
+						Disconnect();
+					}
+					break;
+				default:
+					break;
 				}
 			UpdateStatus();
+
+
+			//#warning COMPLETARE CAMBIO TESTO E FUNZIONE PULSANTE Connect/Disconnect...con if(connected)
+			
+			//if(connData.connectTask == null)
+			//	{
+			//	connData.connectTask = StartConnection();
+			//	}
+			//else if(CheckActiveTask())
+			//	{
+			//	Disconnect();
+			//	}
+			
 			}
 
 		/// <summary>
@@ -817,8 +786,20 @@ namespace RPIconn
 			}
 
 
+
 		#endregion
 
-
+		private void btViewVariables_Click(object sender,EventArgs e)
+			{
+			if(variabili.Values.Count > 0)
+				{
+				StringBuilder strb = new StringBuilder();
+				foreach(string cmd in variabili.Keys)
+					{
+					strb.AppendLine($"{cmd}={variabili[cmd]}");
+					}
+				MessageBox.Show(strb.ToString());
+				}
+			}
 		}
 	}

@@ -44,16 +44,17 @@ namespace RPIconn
 			this.lbQuitPnd = new System.Windows.Forms.Label();
 			this.btCommand = new System.Windows.Forms.Button();
 			this.lbCommands = new System.Windows.Forms.ListBox();
-			this.btViewCommand = new System.Windows.Forms.Button();
+			this.btViewResult = new System.Windows.Forms.Button();
 			this.cbComandi = new System.Windows.Forms.CheckBox();
 			this.cbRisultati = new System.Windows.Forms.CheckBox();
 			this.cbErrori = new System.Windows.Forms.CheckBox();
+			this.btViewVariables = new System.Windows.Forms.Button();
 			this.panel1.SuspendLayout();
 			this.SuspendLayout();
 			// 
 			// bConnect
 			// 
-			this.bConnect.Location = new System.Drawing.Point(14, 91);
+			this.bConnect.Location = new System.Drawing.Point(14, 49);
 			this.bConnect.Name = "bConnect";
 			this.bConnect.Size = new System.Drawing.Size(100, 35);
 			this.bConnect.TabIndex = 3;
@@ -63,7 +64,7 @@ namespace RPIconn
 			// 
 			// bConnInfo
 			// 
-			this.bConnInfo.Location = new System.Drawing.Point(120, 91);
+			this.bConnInfo.Location = new System.Drawing.Point(14, 90);
 			this.bConnInfo.Name = "bConnInfo";
 			this.bConnInfo.Size = new System.Drawing.Size(100, 35);
 			this.bConnInfo.TabIndex = 4;
@@ -73,18 +74,20 @@ namespace RPIconn
 			// 
 			// bDisconnect
 			// 
-			this.bDisconnect.Location = new System.Drawing.Point(14, 132);
+			this.bDisconnect.Enabled = false;
+			this.bDisconnect.Location = new System.Drawing.Point(14, 131);
 			this.bDisconnect.Name = "bDisconnect";
 			this.bDisconnect.Size = new System.Drawing.Size(100, 35);
 			this.bDisconnect.TabIndex = 5;
 			this.bDisconnect.Text = "Disconnect";
 			this.bDisconnect.UseVisualStyleBackColor = true;
+			this.bDisconnect.Visible = false;
 			this.bDisconnect.Click += new System.EventHandler(this.bDisconnect_Click);
 			// 
 			// lbIP
 			// 
 			this.lbIP.AutoSize = true;
-			this.lbIP.Location = new System.Drawing.Point(192, 9);
+			this.lbIP.Location = new System.Drawing.Point(135, 9);
 			this.lbIP.Name = "lbIP";
 			this.lbIP.Size = new System.Drawing.Size(100, 15);
 			this.lbIP.TabIndex = 6;
@@ -93,7 +96,7 @@ namespace RPIconn
 			// LbUsr
 			// 
 			this.LbUsr.AutoSize = true;
-			this.LbUsr.Location = new System.Drawing.Point(327, 9);
+			this.LbUsr.Location = new System.Drawing.Point(263, 9);
 			this.LbUsr.Name = "LbUsr";
 			this.LbUsr.Size = new System.Drawing.Size(12, 15);
 			this.LbUsr.TabIndex = 7;
@@ -115,7 +118,7 @@ namespace RPIconn
 			// lbActive
 			// 
 			this.lbActive.AutoSize = true;
-			this.lbActive.Location = new System.Drawing.Point(506, 9);
+			this.lbActive.Location = new System.Drawing.Point(462, 9);
 			this.lbActive.Name = "lbActive";
 			this.lbActive.Size = new System.Drawing.Size(12, 15);
 			this.lbActive.TabIndex = 10;
@@ -124,7 +127,7 @@ namespace RPIconn
 			// lbMsg
 			// 
 			this.lbMsg.AutoSize = true;
-			this.lbMsg.Location = new System.Drawing.Point(411, 9);
+			this.lbMsg.Location = new System.Drawing.Point(352, 9);
 			this.lbMsg.Name = "lbMsg";
 			this.lbMsg.Size = new System.Drawing.Size(12, 15);
 			this.lbMsg.TabIndex = 11;
@@ -132,7 +135,7 @@ namespace RPIconn
 			// 
 			// bViewMsg
 			// 
-			this.bViewMsg.Location = new System.Drawing.Point(120, 132);
+			this.bViewMsg.Location = new System.Drawing.Point(120, 49);
 			this.bViewMsg.Name = "bViewMsg";
 			this.bViewMsg.Size = new System.Drawing.Size(100, 35);
 			this.bViewMsg.TabIndex = 12;
@@ -152,14 +155,14 @@ namespace RPIconn
 			this.panel1.Dock = System.Windows.Forms.DockStyle.Top;
 			this.panel1.Location = new System.Drawing.Point(0, 0);
 			this.panel1.Name = "panel1";
-			this.panel1.Size = new System.Drawing.Size(697, 34);
+			this.panel1.Size = new System.Drawing.Size(663, 34);
 			this.panel1.TabIndex = 13;
 			// 
 			// lbQuitPnd
 			// 
 			this.lbQuitPnd.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
 			this.lbQuitPnd.AutoSize = true;
-			this.lbQuitPnd.Location = new System.Drawing.Point(598, 9);
+			this.lbQuitPnd.Location = new System.Drawing.Point(512, 9);
 			this.lbQuitPnd.Name = "lbQuitPnd";
 			this.lbQuitPnd.Size = new System.Drawing.Size(12, 15);
 			this.lbQuitPnd.TabIndex = 14;
@@ -168,11 +171,11 @@ namespace RPIconn
 			// 
 			// btCommand
 			// 
-			this.btCommand.Location = new System.Drawing.Point(14, 200);
+			this.btCommand.Location = new System.Drawing.Point(444, 51);
 			this.btCommand.Name = "btCommand";
-			this.btCommand.Size = new System.Drawing.Size(114, 35);
+			this.btCommand.Size = new System.Drawing.Size(206, 35);
 			this.btCommand.TabIndex = 14;
-			this.btCommand.Text = "Command (test)";
+			this.btCommand.Text = "Execute command";
 			this.btCommand.UseVisualStyleBackColor = true;
 			this.btCommand.Click += new System.EventHandler(this.btCommand_Click);
 			// 
@@ -180,28 +183,28 @@ namespace RPIconn
 			// 
 			this.lbCommands.FormattingEnabled = true;
 			this.lbCommands.ItemHeight = 15;
-			this.lbCommands.Location = new System.Drawing.Point(231, 93);
+			this.lbCommands.Location = new System.Drawing.Point(231, 51);
 			this.lbCommands.Name = "lbCommands";
 			this.lbCommands.Size = new System.Drawing.Size(207, 139);
 			this.lbCommands.TabIndex = 15;
 			this.lbCommands.DrawItem += new System.Windows.Forms.DrawItemEventHandler(this.lbCommands_DrawItem);
 			// 
-			// btViewCommand
+			// btViewResult
 			// 
-			this.btViewCommand.Location = new System.Drawing.Point(14, 241);
-			this.btViewCommand.Name = "btViewCommand";
-			this.btViewCommand.Size = new System.Drawing.Size(114, 69);
-			this.btViewCommand.TabIndex = 16;
-			this.btViewCommand.Text = "View command";
-			this.btViewCommand.UseVisualStyleBackColor = true;
-			this.btViewCommand.Click += new System.EventHandler(this.btViewCommand_Click);
+			this.btViewResult.Location = new System.Drawing.Point(444, 92);
+			this.btViewResult.Name = "btViewResult";
+			this.btViewResult.Size = new System.Drawing.Size(100, 69);
+			this.btViewResult.TabIndex = 16;
+			this.btViewResult.Text = "Results";
+			this.btViewResult.UseVisualStyleBackColor = true;
+			this.btViewResult.Click += new System.EventHandler(this.btViewCommand_Click);
 			// 
 			// cbComandi
 			// 
 			this.cbComandi.AutoSize = true;
 			this.cbComandi.Checked = true;
 			this.cbComandi.CheckState = System.Windows.Forms.CheckState.Checked;
-			this.cbComandi.Location = new System.Drawing.Point(134, 241);
+			this.cbComandi.Location = new System.Drawing.Point(550, 93);
 			this.cbComandi.Name = "cbComandi";
 			this.cbComandi.Size = new System.Drawing.Size(75, 19);
 			this.cbComandi.TabIndex = 17;
@@ -213,7 +216,7 @@ namespace RPIconn
 			this.cbRisultati.AutoSize = true;
 			this.cbRisultati.Checked = true;
 			this.cbRisultati.CheckState = System.Windows.Forms.CheckState.Checked;
-			this.cbRisultati.Location = new System.Drawing.Point(134, 266);
+			this.cbRisultati.Location = new System.Drawing.Point(550, 118);
 			this.cbRisultati.Name = "cbRisultati";
 			this.cbRisultati.Size = new System.Drawing.Size(68, 19);
 			this.cbRisultati.TabIndex = 18;
@@ -223,22 +226,33 @@ namespace RPIconn
 			// cbErrori
 			// 
 			this.cbErrori.AutoSize = true;
-			this.cbErrori.Location = new System.Drawing.Point(134, 291);
+			this.cbErrori.Location = new System.Drawing.Point(550, 143);
 			this.cbErrori.Name = "cbErrori";
 			this.cbErrori.Size = new System.Drawing.Size(54, 19);
 			this.cbErrori.TabIndex = 19;
 			this.cbErrori.Text = "Errori";
 			this.cbErrori.UseVisualStyleBackColor = true;
 			// 
+			// btViewVariables
+			// 
+			this.btViewVariables.Location = new System.Drawing.Point(120, 90);
+			this.btViewVariables.Name = "btViewVariables";
+			this.btViewVariables.Size = new System.Drawing.Size(100, 35);
+			this.btViewVariables.TabIndex = 20;
+			this.btViewVariables.Text = "Variables";
+			this.btViewVariables.UseVisualStyleBackColor = true;
+			this.btViewVariables.Click += new System.EventHandler(this.btViewVariables_Click);
+			// 
 			// MainForm
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-			this.ClientSize = new System.Drawing.Size(697, 507);
+			this.ClientSize = new System.Drawing.Size(663, 216);
+			this.Controls.Add(this.btViewVariables);
 			this.Controls.Add(this.cbErrori);
 			this.Controls.Add(this.cbRisultati);
 			this.Controls.Add(this.cbComandi);
-			this.Controls.Add(this.btViewCommand);
+			this.Controls.Add(this.btViewResult);
 			this.Controls.Add(this.lbCommands);
 			this.Controls.Add(this.btCommand);
 			this.Controls.Add(this.panel1);
@@ -272,10 +286,11 @@ namespace RPIconn
 		private System.Windows.Forms.Label lbQuitPnd;
 		private System.Windows.Forms.Button btCommand;
 		private System.Windows.Forms.ListBox lbCommands;
-		private System.Windows.Forms.Button btViewCommand;
+		private System.Windows.Forms.Button btViewResult;
 		private System.Windows.Forms.CheckBox cbComandi;
 		private System.Windows.Forms.CheckBox cbRisultati;
 		private System.Windows.Forms.CheckBox cbErrori;
+		private System.Windows.Forms.Button btViewVariables;
 		}
 	}
 

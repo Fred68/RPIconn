@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+//using System.Threading.Tasks;
 
 namespace RPIconn
 	{
@@ -40,12 +40,12 @@ namespace RPIconn
         /// </summary>
 		public struct ERR
 			{
-			public static string ERROR = "Error";
-			public static string FILENAME = "Error in the file name";
-			public static string COMMANDS = "Errore reading commands";
-			public static string NOT_CONNECTED = "Not connected";
-			public static string COMMAND_NOT_FOUND = "Command not found";
-			public static string COMMAND_EMPTY = "Command without instructions";
+			public const string ERROR = "Error";
+			public const string FILENAME = "Error in the file name";
+			public const string COMMANDS = "Errore reading commands";
+			public const string NOT_CONNECTED = "Not connected";
+			public const string COMMAND_NOT_FOUND = "Command not found";
+			public const string COMMAND_EMPTY = "Command without instructions";
 			
 			}
         /// <summary>
@@ -53,9 +53,9 @@ namespace RPIconn
         /// </summary>
 		public struct MSG
 			{
-			public static string TASK_CANCELED = "Task canceled";
-			public static string TASK_WAITING =  "Task waiting for task end";
-			public static string TASK_RUNNING =  "Task still running";
+			public const string TASK_CANCELED = "Task canceled";
+			public const string TASK_WAITING =  "Task waiting for task end";
+			public const string TASK_RUNNING =  "Task still running";
 			}
 		/// <summary>
 		/// Messaggi dell'interfaccia grafica (dialog box ecc...)
@@ -64,14 +64,17 @@ namespace RPIconn
 			{
 			public struct MSG
 				{
-				public static string USCIRE = @"Exit program ?";
-				public static string TASK_ATTIVI = @"Some commands are still running. Proceed ?";
+				public const string USCIRE = @"Exit program ?";
+				public const string TASK_ATTIVI = @"Some commands are still running. Proceed ?";
+				public const string CONNECT = @"Connect";
+				public const string DISCONNECT = @"Disconnect";
+				public const string BUSY = @"Busy";
 				}
 			public struct TIT
 				{
-				public static string USCIRE = @"Quitting....";
-				public static string MESSAGGI = @"Messages";
-				public static string TASK = @"Task";
+				public const string USCIRE = @"Quitting....";
+				public const string MESSAGGI = @"Messages";
+				public const string TASK = @"Task";
 				}
 			}
 		/// <summary>
