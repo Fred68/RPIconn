@@ -64,15 +64,16 @@ namespace RPIconn
 			{
 			public struct MSG
 				{
-				public const string USCIRE = @"Exit program ?";
+				public const string EXIT = @"Exit program ?";
 				public const string TASK_ATTIVI = @"Some commands are still running. Proceed ?";
 				public const string CONNECT = @"Connect";
 				public const string DISCONNECT = @"Disconnect";
 				public const string BUSY = @"Busy";
+				public const string STOP_CONN = @"Stop connection ?";
 				}
 			public struct TIT
 				{
-				public const string USCIRE = @"Quitting....";
+				public const string EXIT = @"Quitting....";
 				public const string MESSAGGI = @"Messages";
 				public const string TASK = @"Task";
 				}

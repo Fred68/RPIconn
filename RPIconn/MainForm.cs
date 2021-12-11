@@ -30,6 +30,11 @@ namespace RPIconn
 		//			Capire come leggere le risposte in modo sincrono (leggere i nomi delle variabili con Back12.sh -i). Leggere l'output.
 
 		#warning DA FARE:
+
+		//			Aggiungere connessione sftp
+
+		#warning	Vedere: https://ourcodeworld.com/articles/read/369/how-to-access-a-sftp-server-using-ssh-net-sync-and-async-with-c-in-winforms
+
 		#warning	Occhio al ciclo di lettura della lista dei messaggi (yield retunn). Aggiungere lock() o impedire la cancellazione di messaggi (solo sotto lock): fare una classe derivata ?
 			
 		#warning	File di configurazione: come codificare nel file la lettura dei dati ricevuti. Per ora comando READ per leggere le variabili
@@ -109,20 +114,20 @@ namespace RPIconn
 		/// <summary>
 		/// Enum with connection stat
 		/// </summary>
-		public enum ConnectionStatEnum {Disconnected, Connecting, Disconnecting, Connected};
+		public enum ConnectionStatEnum {Disconnected = 0, Connecting, Disconnecting, Connected};
 
 		/// <summary>
-		/// Connection stat property (read only)
+		/// Ssh connection stat property (read only)
 		/// </summary>
-		public ConnectionStatEnum ConnectionStatus
+		public ConnectionStatEnum SshConnectionStatus
 			{
 			get
 				{
 				ConnectionStatEnum cstat = ConnectionStatEnum.Disconnected;
 				
-				if(connData.connectTask != null)
+				if(connData.sshConnectTask != null)
 					{
-					if(!connData.ct.IsCancellationRequested)
+					if(!connData.ssh_ct.IsCancellationRequested)
 						cstat = ConnectionStatEnum.Connecting;
 					else
 						cstat = ConnectionStatEnum.Disconnecting;
@@ -136,12 +141,38 @@ namespace RPIconn
 				return cstat;
 				}
 			}
-			
+
+		/// <summary>
+		/// Sftp connection stat property (read only)
+		/// </summary>
+		public ConnectionStatEnum SftpConnectionStatus
+			{
+			get
+				{
+				ConnectionStatEnum cstat = ConnectionStatEnum.Disconnected;
+				
+				if(connData.sftpConnectTask != null)
+					{
+					if(!connData.ssh_ct.IsCancellationRequested)
+						cstat = ConnectionStatEnum.Connecting;
+					else
+						cstat = ConnectionStatEnum.Disconnecting;
+					}
+				else
+					{
+					if(connData.sftpClient != null)
+						if(connData.sftpClient.IsConnected)
+							cstat = ConnectionStatEnum.Connected;
+					}
+				return cstat;
+				}
+			}			
+
 		/// <summary>
 		/// Check if ssh connection is active
 		/// </summary>
 		/// <returns></returns>
-		public bool IsConnected
+		public bool IsSshConnected
 			{
 			get
 				{
@@ -152,16 +183,32 @@ namespace RPIconn
 				return conn;
 				}
 			}
+
+		/// <summary>
+		/// Check if sftp connection is active
+		/// </summary>
+		/// <returns></returns>
+		public bool IsSftpConnected
+			{
+			get
+				{
+				bool conn = false;
+				if(connData.sftpClient != null)
+					if(connData.sftpClient.IsConnected)
+						conn = true;
+				return conn;
+				}
+			}
 		
 		/// <summary>
-		/// Get connection Task status (if running or not)
+		/// Get ssh connection Task status (if running or not)
 		/// </summary>
-		public bool IsConnRunning
+		public bool IsSshConnRunning
 			{
 			get
 				{
 				bool run = false;
-				if(connData.connectTask != null)
+				if(connData.sshConnectTask != null)
 					{
 					// Calling task.IsCompleted stop the current thread until the task is really completed
 					//if(!connectTask.IsCompleted)
@@ -173,9 +220,28 @@ namespace RPIconn
 			}
 
 		/// <summary>
-		/// Get connection username and host (IP)
+		/// Get sftp connection Task status (if running or not)
 		/// </summary>
-		public Tuple<string,string> ConnStat
+		public bool IsSftpConnRunning
+			{
+			get
+				{
+				bool run = false;
+				if(connData.sftpConnectTask != null)
+					{
+					// Calling task.IsCompleted stop the current thread until the task is really completed
+					//if(!connectTask.IsCompleted)
+					//	run = true;
+					run = true;
+					}
+				return run;
+				}
+			}
+
+		/// <summary>
+		/// Get ssh connection username and host (IP)
+		/// </summary>
+		public Tuple<string,string> SshConnStat
 			{
 			get
 				{
@@ -185,6 +251,26 @@ namespace RPIconn
 					if(connData.sshClient.IsConnected)
 						{
 						ConnectionInfo cinfo = connData.sshClient.ConnectionInfo;
+						host = cinfo.Host;
+						user = cinfo.Username;
+						}
+				return new Tuple<string,string>(host,user);
+				}
+			}
+
+		/// <summary>
+		/// Get sftp connection username and host (IP)
+		/// </summary>
+		public Tuple<string,string> SftpConnStat
+			{
+			get
+				{
+				string host = "-";
+				string user = "-";
+				if(connData.sftpClient != null)
+					if(connData.sftpClient.IsConnected)
+						{
+						ConnectionInfo cinfo = connData.sftpClient.ConnectionInfo;
 						host = cinfo.Host;
 						user = cinfo.Username;
 						}
@@ -240,9 +326,11 @@ namespace RPIconn
 
 		#region MAIN FORM
 		#region GUI
-		Font lbFont;
+		Font lbFont;	
+		SolidBrush[] brushes;
+
 		SolidBrush lbBrushAvail;
-		SolidBrush lbBrushUnavai;
+		SolidBrush lbBrushUnavail;
 		#endregion
 		
 		
@@ -273,8 +361,15 @@ namespace RPIconn
 		private void MainForm_Load(object sender,EventArgs e)
 			{
 			lbFont = new Font(Defs.FONT, Defs.FONT_SIZE);
-			lbBrushAvail = new SolidBrush(Color.Blue);
-			lbBrushUnavai = new SolidBrush(Color.DarkRed);
+
+			brushes = new SolidBrush[Enum.GetNames(typeof(ConnectionStatEnum)).Length];
+			brushes[(int)ConnectionStatEnum.Disconnected] = new SolidBrush(Color.DarkRed);
+			brushes[(int)ConnectionStatEnum.Connecting] = new SolidBrush(Color.Yellow);
+			brushes[(int)ConnectionStatEnum.Disconnecting] = new SolidBrush(Color.Orange);
+			brushes[(int)ConnectionStatEnum.Connected] = new SolidBrush(Color.Green);
+			
+			lbBrushAvail = brushes[(int)ConnectionStatEnum.Connected];
+			lbBrushUnavail = brushes[(int)ConnectionStatEnum.Disconnected];
 
 			refreshTimer.Interval = (int)(Defs.CONN_REFRESH*1000f);
 			refreshTimer.Enabled = true;
@@ -294,6 +389,9 @@ namespace RPIconn
 
 			lbCommands.DrawMode = DrawMode.OwnerDrawFixed;
 
+			lbSshStat.Text = "Ssh";
+			lbSftpStat.Text = "Sftp";
+
 			UpdateStatus();
 			}
 
@@ -302,31 +400,51 @@ namespace RPIconn
 		/// </summary>
 		public void UpdateStatus()
 			{
-			lbStat.Text = this.ConnectionStatus.ToString();
 
-			switch(ConnectionStatus)
+			lbSshStat.ForeColor = brushes[(int)this.SshConnectionStatus].Color;
+			lbSftpStat.ForeColor = brushes[(int)this.SftpConnectionStatus].Color;
+
+			switch(SshConnectionStatus)
 				{
 				case ConnectionStatEnum.Connected:
 					{
-					bConnect.Text = Messaggi.GUI.MSG.DISCONNECT;
+					bSshConnect.Text = Messaggi.GUI.MSG.DISCONNECT;
 					}
 					break;
 				case ConnectionStatEnum.Disconnected:
 					{
-					bConnect.Text = Messaggi.GUI.MSG.CONNECT;
+					bSshConnect.Text = Messaggi.GUI.MSG.CONNECT;
 					}
 					break;
 				default:
 					{
-					bConnect.Text = this.ConnectionStatus.ToString()+"...";
+					bSshConnect.Text = this.SshConnectionStatus.ToString()+"...";
 					}
 					break;
 				}
 
+			switch(SftpConnectionStatus)
+				{
+				case ConnectionStatEnum.Connected:
+					{
+					bSftpConnect.Text = Messaggi.GUI.MSG.DISCONNECT;
+					}
+					break;
+				case ConnectionStatEnum.Disconnected:
+					{
+					bSftpConnect.Text = Messaggi.GUI.MSG.CONNECT;
+					}
+					break;
+				default:
+					{
+					bSftpConnect.Text = this.SftpConnectionStatus.ToString()+"...";
+					}
+					break;
+				}
 			
 			lbQuitPnd.Text = pendingQuit ? "Closing program" : string.Empty;
 
-			Tuple<string,string> cinfo = ConnStat;
+			Tuple<string,string> cinfo = SshConnStat;
 			lbIP.Text = cinfo.Item1;
 			LbUsr.Text = cinfo.Item2;
 			
@@ -381,9 +499,9 @@ namespace RPIconn
 		#region CONNECTION
 
 		/// <summary>
-		/// Connect to server (not asynchronous)
+		/// Connect to ssh server (not asynchronous)
 		/// </summary>
-		SshClient Connect()
+		SshClient SshConnect()
 			{
 			SshClient sshc = null;
 			Messaggi.Clear();
@@ -403,40 +521,103 @@ namespace RPIconn
 			}
 
 		/// <summary>
+		/// Connect to sftp server (not asynchronous)
+		/// </summary>
+		SftpClient SftpConnect()
+			{
+			SftpClient sftpc = null;
+			Messaggi.Clear();
+			try
+				{
+				sftpc = new SftpClient(cfg[Defs.IP], cfg[Defs.USR], cfg[Defs.PWD]);
+				sftpc.Connect();
+				}
+			catch(Exception ex)
+				{
+				Messaggi.AddMessage(Messaggi.ERR.ERROR, Messaggi.Tipo.Errori, ex.Message);
+				if(sftpc != null)
+					sftpc.Disconnect();
+				sftpc = null;
+				}
+			return sftpc;
+			}
+
+		/// <summary>
 		/// Start connection task
 		/// and prepare callback function
 		/// </summary>
-		Task<SshClient> StartConnection()
+		Task<SshClient> StartSshConnection()
 			{
 			Task<SshClient> task = null;
 			if(ReadConnPar(configFile, ref cfg))
 				{
-				if(!IsConnected)
+				if(!IsSshConnected)
 					{
-					connData.cts = new CancellationTokenSource();
-					connData.ct = connData.cts.Token;
-					if( (connData.ct != CancellationToken.None) && (connData.cts != null))		// If cancellation toke and sourc are not null...
+					connData.ssh_cts = new CancellationTokenSource();
+					connData.ssh_ct = connData.ssh_cts.Token;
+					if( (connData.ssh_ct != CancellationToken.None) && (connData.ssh_cts != null))		// If cancellation toke and sourc are not null...
 						 {
-						 connData.ct.Register( () =>										// Register callback function, when task is canceled
+						 connData.ssh_ct.Register( () =>										// Register callback function, when task is canceled
 							{
 							#if DEBUG
 							MessageBox.Show(Messaggi.MSG.TASK_CANCELED);
 							#endif
-							connData.cts.Dispose();										// Clear object (no more valid, token expired)
+							connData.ssh_cts.Dispose();										// Clear object (no more valid, token expired)
 							panel1.BeginInvoke(new Action( () =>	{
 																	UpdateStatus();
 																	}
 															));	// Update status (when UI thread is ready).
 							#if DEBUG
-							Messaggi.AddMessage("Arresto in corso del task di connessione");
+							Messaggi.AddMessage("Arresto in corso del task di connessione ssh");
 							#endif
 							}
 							);
 						 }
-					task = Task<SshClient>.Factory.StartNew( () => Connect(), connData.ct);
+					task = Task<SshClient>.Factory.StartNew( () => SshConnect(), connData.ssh_ct);
 					if(task != null)
 						{
-						task.ContinueWith(AfterConnection);
+						task.ContinueWith(AfterSshConnection);
+						}
+					}
+				}
+			return task;
+			}
+
+		/// <summary>
+		/// Start connection task
+		/// and prepare callback function
+		/// </summary>
+		Task<SftpClient> StartSftpConnection()
+			{
+			Task<SftpClient> task = null;
+			if(ReadConnPar(configFile, ref cfg))
+				{
+				if(!IsSftpConnected)
+					{
+					connData.sftp_cts = new CancellationTokenSource();
+					connData.sftp_ct = connData.sftp_cts.Token;
+					if( (connData.sftp_ct != CancellationToken.None) && (connData.sftp_cts != null))		// If cancellation toke and sourc are not null...
+						 {
+						 connData.sftp_ct.Register( () =>										// Register callback function, when task is canceled
+							{
+							#if DEBUG
+							MessageBox.Show(Messaggi.MSG.TASK_CANCELED);
+							#endif
+							connData.sftp_cts.Dispose();										// Clear object (no more valid, token expired)
+							panel1.BeginInvoke(new Action( () =>	{
+																	UpdateStatus();
+																	}
+															));	// Update status (when UI thread is ready).
+							#if DEBUG
+							Messaggi.AddMessage("Arresto in corso del task di connessione sftp");
+							#endif
+							}
+							);
+						 }
+					task = Task<SftpClient>.Factory.StartNew( () => SftpConnect(), connData.sftp_ct);
+					if(task != null)
+						{
+						task.ContinueWith(AfterSftpConnection);
 						}
 					}
 				}
@@ -447,7 +628,7 @@ namespace RPIconn
 		/// Callback function, after connection task is completed
 		/// </summary>
 		/// <param name="t"></param>
-		void AfterConnection(Task<SshClient> t)
+		void AfterSshConnection(Task<SshClient> t)
 			{
 			SshClient res = t.Result;		// Read SshClient return value from delegate function started in the task
 			if(res != null)
@@ -455,9 +636,34 @@ namespace RPIconn
 				connData.sshClient = res;			// Saves connection data
 				}
 			#if DEBUG
-			Messaggi.AddMessage($"Task is completed {t.Status.ToString()}");
+			Messaggi.AddMessage($"Ssh task is completed {t.Status.ToString()}");
 			#endif
-			connData.connectTask = null;			// Clear the task
+			connData.sshConnectTask = null;			// Clear the task
+			BeginInvoke(new Action( () =>	{
+											UpdateStatus();		// Update status (when UI thread is ready) but does not stop the calling thread
+											}					// EndInvoke() is not necessary (no need of a callback method).
+									));		
+			if(pendingQuit)
+				{
+				BeginInvoke(new Action( () => Close()));		// Close application windows (when UI thread is ready).
+				}
+			} 
+
+		/// <summary>
+		/// Callback function, after connection task is completed
+		/// </summary>
+		/// <param name="t"></param>
+		void AfterSftpConnection(Task<SftpClient> t)
+			{
+			SftpClient res = t.Result;		// Read SshClient return value from delegate function started in the task
+			if(res != null)
+				{
+				connData.sftpClient = res;			// Saves connection data
+				}
+			#if DEBUG
+			Messaggi.AddMessage($"Sftp task is completed {t.Status.ToString()}");
+			#endif
+			connData.sftpConnectTask = null;			// Clear the task
 			BeginInvoke(new Action( () =>	{
 											UpdateStatus();		// Update status (when UI thread is ready) but does not stop the calling thread
 											}					// EndInvoke() is not necessary (no need of a callback method).
@@ -488,17 +694,17 @@ namespace RPIconn
 		/// <summary>
 		/// Disconnect
 		/// </summary>
-		void Disconnect()
+		void SshDisconnect()
 			{
 			if(!CheckActiveTask())								// Ask, if there is an active task
 				return;
-			if(connData.connectTask != null)					// If still connecting (i.e.: double click on disconnect, token already used)
+			if(connData.sshConnectTask != null)					// If still connecting (i.e.: double click on disconnect, token already used)
 				{
-				if(!connData.ct.IsCancellationRequested)		// If no task cancellation request pending...
+				if(!connData.ssh_ct.IsCancellationRequested)		// If no task cancellation request pending...
 					{
-					connData.cts.Cancel();						// ...request connection task cancellation
+					connData.ssh_cts.Cancel();						// ...request connection task cancellation
 					#if DEBUG
-					Messaggi.AddMessage("Richiesta cancellazione del task di connessione");
+					Messaggi.AddMessage("Richiesta cancellazione del task di connessione ssh");
 					#endif
 					Thread.Sleep(Defs.CANCEL_PAUSE);		// Wait task to stop (msec)
 					}
@@ -509,7 +715,7 @@ namespace RPIconn
 				bool taskcompleted = true;			// Salva lo stato del task
 				try
 					{
-					taskcompleted = connData.connectTask.IsCompleted;	// In try block: connectTask might have become null
+					taskcompleted = connData.sshConnectTask.IsCompleted;	// In try block: connectTask might have become null
 					}
 				catch
 					{
@@ -518,7 +724,7 @@ namespace RPIconn
 				if(!taskcompleted)					// If still connecting... This test waits for the task completion...!
 					{
 					#if DEBUG
-					Messaggi.AddMessage("Il task di connessione non è ancora completato");
+					Messaggi.AddMessage("Il task di connessione ssh non è ancora completato");
 					#endif
 					// connectTask.Wait();			// ...wait for task completion. NO: continue executionn
 					// ...connectTask.IsCompleted.ToString()}... This command waits for task completion. NO: continue execution.
@@ -526,9 +732,9 @@ namespace RPIconn
 					}
 				else
 					{
-					connData.connectTask = null;					// At the end, reset task to null, anyway.
+					connData.sshConnectTask = null;					// At the end, reset task to null, anyway.
 					#if DEBUG
-					Messaggi.AddMessage($"Task di connessione azzerato");
+					Messaggi.AddMessage($"Task di connessione ssh azzerato");
 					#endif
 					}
 				}
@@ -550,6 +756,70 @@ namespace RPIconn
 				Close();		// ...ask for Close() again (for the Main UI Thread)
 			}
 
+		/// <summary>
+		/// Disconnect
+		/// </summary>
+		void SftpDisconnect()
+			{
+			if(!CheckActiveTask())								// Ask, if there is an active task
+				return;
+			if(connData.sftpConnectTask != null)					// If still connecting (i.e.: double click on disconnect, token already used)
+				{
+				if(!connData.sftp_ct.IsCancellationRequested)		// If no task cancellation request pending...
+					{
+					connData.sftp_cts.Cancel();						// ...request connection task cancellation
+					#if DEBUG
+					Messaggi.AddMessage("Richiesta cancellazione del task di connessione sftp");
+					#endif
+					Thread.Sleep(Defs.CANCEL_PAUSE);		// Wait task to stop (msec)
+					}
+				else								// If a cancellation request is pending...
+					{
+					return;							// ...do nothing and exit function
+					}
+				bool taskcompleted = true;			// Salva lo stato del task
+				try
+					{
+					taskcompleted = connData.sftpConnectTask.IsCompleted;	// In try block: connectTask might have become null
+					}
+				catch
+					{
+					taskcompleted = true;
+					}
+				if(!taskcompleted)					// If still connecting... This test waits for the task completion...!
+					{
+					#if DEBUG
+					Messaggi.AddMessage("Il task di connessione sftp non è ancora completato");
+					#endif
+					// connectTask.Wait();			// ...wait for task completion. NO: continue executionn
+					// ...connectTask.IsCompleted.ToString()}... This command waits for task completion. NO: continue execution.
+					return;
+					}
+				else
+					{
+					connData.sftpConnectTask = null;					// At the end, reset task to null, anyway.
+					#if DEBUG
+					Messaggi.AddMessage($"Task di connessione sftp azzerato");
+					#endif
+					}
+				}
+			if(connData.sftpClient != null)					// If sftpClient is not null...
+				{
+				#if DEBUG
+				Messaggi.AddMessage($"Disconnessione del client sftp");
+				#endif
+				connData.sftpClient.Disconnect();				// ...disconnct, anyway.
+				connData.sftpClient = null;
+				#if DEBUG
+				Messaggi.AddMessage($"Azzeramento del Client sftp");
+				#endif
+				}
+			#if DEBUG
+			Messaggi.AddMessage($"Client sftp is {((connData.sftpClient == null) ? string.Empty : "not ")}null");
+			#endif
+			if(pendingQuit)		// If there is a Close() request (quit program) when task or connection were active...
+				Close();		// ...ask for Close() again (for the Main UI Thread)
+			}
 
 		/// <summary>
 		/// Read config file with connection parameters and fill dictionary
@@ -599,41 +869,56 @@ namespace RPIconn
 		#region EVENT HANDLERS
 		
 		/// <summary>
-		/// Connect button
+		/// Ssh connect button
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		private void bConnect_Click(object sender,EventArgs e)
+		private void bSshConnect_Click(object sender,EventArgs e)
 			{
-			switch(this.ConnectionStatus)
+			switch(this.SshConnectionStatus)
 				{
 				case ConnectionStatEnum.Disconnected:
 					{
-					connData.connectTask = StartConnection();
+					connData.sshConnectTask = StartSshConnection();
 					}
 					break;
 				case ConnectionStatEnum.Connected:
 					{
 					if(CheckActiveTask())
-						Disconnect();
+						SshDisconnect();
 					}
 					break;
 				default:
 					break;
 				}
 			UpdateStatus();
-
-
-			//#warning COMPLETARE CAMBIO TESTO E FUNZIONE PULSANTE Connect/Disconnect...con if(connected)
 			
-			//if(connData.connectTask == null)
-			//	{
-			//	connData.connectTask = StartConnection();
-			//	}
-			//else if(CheckActiveTask())
-			//	{
-			//	Disconnect();
-			//	}
+			}
+
+		/// <summary>
+		/// Sftp connect button
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		private void bSftpConnect_Click(object sender,EventArgs e)
+			{
+			switch(this.SftpConnectionStatus)
+				{
+				case ConnectionStatEnum.Disconnected:
+					{
+					connData.sftpConnectTask = StartSftpConnection();
+					}
+					break;
+				case ConnectionStatEnum.Connected:
+					{
+					if(CheckActiveTask())
+						SftpDisconnect();
+					}
+					break;
+				default:
+					break;
+				}
+			UpdateStatus();
 			
 			}
 
@@ -642,19 +927,30 @@ namespace RPIconn
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		private void bConnInfo_Click(object sender,EventArgs e)
+		private void bSshConnInfo_Click(object sender,EventArgs e)
 			{
 			UpdateStatus();
+			StringBuilder strb = new StringBuilder();
 			if(connData.sshClient != null)
 				{
-				StringBuilder strb = new StringBuilder();
+				strb.AppendLine("SSH");
 				strb.AppendLine($"Host: {connData.sshClient.ConnectionInfo.Host}");
 				strb.AppendLine($"Port: {connData.sshClient.ConnectionInfo.Port.ToString()}");
 				strb.AppendLine($"Username: {connData.sshClient.ConnectionInfo.Username}");
 				strb.AppendLine($"Server: {connData.sshClient.ConnectionInfo.ServerVersion}");
 				strb.AppendLine($"Client: {connData.sshClient.ConnectionInfo.ClientVersion}");
-				MessageBox.Show(strb.ToString());
 				}
+			if(connData.sftpClient != null)
+				{
+				strb.AppendLine("SFTP");
+				strb.AppendLine($"Host: {connData.sftpClient.ConnectionInfo.Host}");
+				strb.AppendLine($"Port: {connData.sftpClient.ConnectionInfo.Port.ToString()}");
+				strb.AppendLine($"Username: {connData.sftpClient.ConnectionInfo.Username}");
+				strb.AppendLine($"Server: {connData.sftpClient.ConnectionInfo.ServerVersion}");
+				strb.AppendLine($"Client: {connData.sftpClient.ConnectionInfo.ClientVersion}");
+				}
+			if(strb.Length > 1)
+				MessageBox.Show(strb.ToString());
 			}
 
 		/// <summary>
@@ -662,10 +958,10 @@ namespace RPIconn
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		private void bDisconnect_Click(object sender,EventArgs e)
+		private void bSshDisconnect_Click(object sender,EventArgs e)
 			{
 			if(CheckActiveTask())
-				Disconnect();
+				SshDisconnect();
 			UpdateStatus();
 			}
 
@@ -686,22 +982,41 @@ namespace RPIconn
 		/// <param name="e"></param>
 		private void MainForm_FormClosing(object sender,FormClosingEventArgs e)
 			{
-			if(ConnectionStatus != ConnectionStatEnum.Disconnected)		// If not disconnected...
+
+			// Ask to close connection
+			if((SshConnectionStatus != ConnectionStatEnum.Disconnected) || (SftpConnectionStatus != ConnectionStatEnum.Disconnected))
+				{
+				if(MessageBox.Show(Messaggi.GUI.MSG.STOP_CONN, Messaggi.GUI.TIT.EXIT, MessageBoxButtons.YesNo) != DialogResult.Yes)
+					{
+					pendingQuit = false;
+					e.Cancel = true;
+					return;
+					}
+				}
+
+			if(SshConnectionStatus != ConnectionStatEnum.Disconnected)		// If not disconnected...
 					{
 					pendingQuit = true;			// ...request quit after connection task is finished
-					Disconnect();
+					SshDisconnect();
+					e.Cancel = true;
+					UpdateStatus();
+					}
+			else if(SftpConnectionStatus != ConnectionStatEnum.Disconnected)		// If not disconnected...
+					{
+					pendingQuit = true;			// ...request quit after connection task is finished
+					SftpDisconnect();
 					e.Cancel = true;
 					UpdateStatus();
 					}
 			else								// If disconnected, ask and close
 				{
-				if(MessageBox.Show(Messaggi.GUI.MSG.USCIRE, Messaggi.GUI.TIT.USCIRE, MessageBoxButtons.YesNo) != DialogResult.Yes)
+				if(MessageBox.Show(Messaggi.GUI.MSG.EXIT, Messaggi.GUI.TIT.EXIT, MessageBoxButtons.YesNo) != DialogResult.Yes)
 					{
 					pendingQuit = false;
 					e.Cancel = true;
 					}
 				}
-			if((ConnectionStatus == ConnectionStatEnum.Connected) && (RunningTasks > 0))
+			if(((SshConnectionStatus == ConnectionStatEnum.Connected) || (SftpConnectionStatus == ConnectionStatEnum.Connected)) && (RunningTasks > 0))
 				{
 				Messaggi.AddMessage(Messaggi.MSG.TASK_RUNNING,Messaggi.Tipo.Messaggi);
 				e.Cancel = true;
@@ -739,7 +1054,7 @@ namespace RPIconn
 				int left = e.Bounds.Left;
 				int top = e.Bounds.Top;
 				e.DrawBackground();
-				e.Graphics.DrawString(selitem, lbFont, ct.IsRunning ? lbBrushUnavai : lbBrushAvail, left, top);
+				e.Graphics.DrawString(selitem, lbFont, ct.IsRunning ? lbBrushUnavail : lbBrushAvail, left, top);
 				}
 			}
 
@@ -789,6 +1104,11 @@ namespace RPIconn
 
 		#endregion
 
+		/// <summary>
+		/// Vie variables
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		private void btViewVariables_Click(object sender,EventArgs e)
 			{
 			if(variabili.Values.Count > 0)
@@ -799,6 +1119,29 @@ namespace RPIconn
 					strb.AppendLine($"{cmd}={variabili[cmd]}");
 					}
 				MessageBox.Show(strb.ToString());
+				}
+			}
+
+		private void bTestSftp_Click(object sender,EventArgs e)
+			{
+			if(SftpConnectionStatus == ConnectionStatEnum.Connected)
+				{
+				string path = tbPath.Text;
+				try
+					{
+					StringBuilder strb = new StringBuilder();
+					strb.AppendLine($"Directory of '{path}':");
+					IEnumerable<Renci.SshNet.Sftp.SftpFile> files = connData.sftpClient.ListDirectory(path);
+					foreach(Renci.SshNet.Sftp.SftpFile f in files)
+						{
+						strb.AppendLine(f.Name);
+						}
+					Messaggi.AddMessage(strb.ToString());
+					}
+				catch(Exception ex)
+					{
+					Messaggi.AddMessage(Messaggi.ERR.ERROR, Messaggi.Tipo.Errori, ex.Message);
+					}
 				}
 			}
 		}
